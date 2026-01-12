@@ -55,4 +55,38 @@ RSpec.describe "Base Translator" do
     expect(html).not_to be_nil
     expect(html.last).to eq("<b>Hi</b>")
   end
+
+  context "with parallelize: 2" do
+    before do
+      allow(task).to receive(:translation_config).and_return({parallelize: 2})
+    end
+
+    it "translates correctly with multiple threads" do
+      translator = translator_class.new(task)
+
+      list = [
+        ["key1", "One"],
+        ["key2", "Two"],
+        ["key3", "Three"],
+        ["key4", "Four"]
+      ]
+
+      result = translator.send(:translate_pairs, list, from: "en", to: "es")
+
+      expect(result.assoc("key1").last).to eq("One-es")
+      expect(result.assoc("key2").last).to eq("Two-es")
+      expect(result.assoc("key3").last).to eq("Three-es")
+      expect(result.assoc("key4").last).to eq("Four-es")
+    end
+
+    it "preserves key order with parallel execution" do
+      translator = translator_class.new(task)
+
+      list = (1..10).map { |i| ["key#{i}", "Value#{i}"] }
+
+      result = translator.send(:translate_pairs, list, from: "en", to: "es")
+
+      expect(result.map(&:first)).to eq((1..10).map { |i| "key#{i}" })
+    end
+  end
 end

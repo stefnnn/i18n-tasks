@@ -105,9 +105,10 @@ search:
   ## Multiple scanners can be used. Their results are merged.
   ## The options specified above are passed down to each scanner. Per-scanner options can be specified as well.
   ## See this example of a custom scanner: https://github.com/glebm/i18n-tasks/wiki/A-custom-scanner-example
-
 ## Translation Services
 # translation:
+#   # Number of parallel threads for translation API calls (default: 1)
+#   parallelize: 1
 #   # Omit keys that fail to translate instead of keeping untranslated values (default: false)
 #   omit_failed: false
 #   # Google Translate

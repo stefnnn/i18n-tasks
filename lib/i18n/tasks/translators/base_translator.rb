@@ -66,6 +66,10 @@ module I18n::Tasks
         @i18n_tasks.translation_config[:omit_failed]
       end
 
+      def parallelize_count
+        @i18n_tasks.translation_config[:parallelize] || 1
+      end
+
       def handle_failed_translation(list_slice, locale, error)
         log_verbose "Translation failed for locale #{locale}"
         log_verbose "  Error: #{error.class.name}: #{error.message}"
@@ -84,6 +88,36 @@ module I18n::Tasks
       # @param [Array<[String, Object]>] list of key-value pairs
       # @return [Array<[String, Object]>] translated list
       def fetch_translations(list, opts)
+        return fetch_translations_single(list, opts) if parallelize_count <= 1
+
+        chunk_size = (list.size.to_f / parallelize_count).ceil
+        chunks = list.each_slice(chunk_size).to_a
+        return fetch_translations_single(list, opts) if chunks.size <= 1
+
+        results = Array.new(chunks.size)
+        queue = Queue.new
+
+        chunks.each_with_index { |chunk, idx| queue << [chunk, idx] }
+        parallelize_count.times { queue << nil }
+
+        threads = Array.new(parallelize_count) do
+          Thread.new do
+            while (item = queue.pop)
+              chunk, idx = item
+              begin
+                results[idx] = fetch_translations_single(chunk, opts)
+              rescue => e
+                results[idx] = handle_failed_translation(chunk, opts[:to], e)
+              end
+            end
+          end
+        end
+
+        threads.each(&:join)
+        results.flatten(1)
+      end
+
+      def fetch_translations_single(list, opts)
         options = options_for_translate_values(**opts)
         from_values(list, translate_values(to_values(list, options), **options), options).tap do |result|
           fail CommandError, no_results_error_message if result.blank?
